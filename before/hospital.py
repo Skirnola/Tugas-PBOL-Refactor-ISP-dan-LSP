@@ -10,24 +10,7 @@ ids = []
 number = []
 patients = []
 
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PELANGGARAN 1 — ISP (dikerjakan Orang 1)                   ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  BaseAppManager adalah "fat interface": memiliki metode      ║
-# ║  show_form(), save_data(), delete_data(), generate_report()  ║
-# ║  yang DIPAKSA diimplementasi semua subclass, padahal:        ║
-# ║    - Application tidak butuh generate_report()               ║
-# ║    - ReportOnlyApp tidak butuh save_data()/delete_data()     ║
-# ║                                                              ║
-# ║  Solusi: pisah menjadi 3 interface kecil:                    ║
-# ║    IFormView   → show_form()                                 ║
-# ║    IDataWriter → save_data(), delete_data()                  ║
-# ║    IReportable → generate_report()                           ║
-# ╚══════════════════════════════════════════════════════════════╝
-
 class BaseAppManager:
-    """Fat interface — semua method dipaksa ada di tiap subclass."""
 
     def show_form(self):
         raise NotImplementedError
@@ -40,29 +23,6 @@ class BaseAppManager:
 
     def generate_report(self):
         raise NotImplementedError
-
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PELANGGARAN 2 — LSP: AdminApplication (dikerjakan Orang 2) ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  Pola: subclass raise exception yang parent TIDAK raise.     ║
-# ║                                                              ║
-# ║  Application.validate_input() → tidak pernah raise,          ║
-# ║                                  hanya return True / False   ║
-# ║  AdminApplication.validate_input() → raise ValueError        ║
-# ║                                                              ║
-# ║  Akibat: kode yang memakai Application tidak bisa            ║
-# ║  digantikan AdminApplication tanpa try/except tambahan,      ║
-# ║  sehingga substitusi (LSP) gagal.                            ║
-# ║                                                              ║
-# ║  Contoh kode yang crash:                                     ║
-# ║    app = AdminApplication(window)                            ║
-# ║    if not app.validate_input("","","","",""):  ← ValueError! ║
-# ║        messagebox.showwarning(...)                           ║
-# ║                                                              ║
-# ║  Solusi: hapus raise, kembalikan return False sesuai         ║
-# ║          kontrak parent.                                     ║
-# ╚══════════════════════════════════════════════════════════════╝
 
 class Application(BaseAppManager):
 
@@ -77,9 +37,8 @@ class Application(BaseAppManager):
         self.updateframe = Frame(self.window)
         self.deleteframe = Frame(self.window)
 
-    # ── Pelanggaran ISP: terpaksa implementasi method yang tidak dipakai ──
     def generate_report(self):
-        pass  # ← Application tidak butuh ini, tapi dipaksa ada oleh BaseAppManager
+        pass 
 
     def show_form(self):
         self.startpage()
@@ -90,9 +49,7 @@ class Application(BaseAppManager):
     def delete_data(self):
         self.deletee()
 
-    # ── Kontrak parent untuk LSP: TIDAK pernah raise, hanya return bool ──
     def validate_input(self, val1, val2, val3, val4, val5):
-        """Parent contract: return True jika valid, False jika tidak. Tidak raise."""
         if val1 == '' or val2 == '' or val3 == '' or val4 == '' or val5 == '':
             return False
         return True
@@ -333,64 +290,23 @@ class Application(BaseAppManager):
         self.deletee()
         self.deleteframe.pack()
 
-
-# ── Pelanggaran 2: AdminApplication melanggar LSP ─────────────────────────
 class AdminApplication(Application):
-    """
-    PELANGGARAN LSP — pola: subclass raise exception yang parent tidak raise.
-
-    Application.validate_input() tidak pernah raise exception apapun.
-    AdminApplication.validate_input() malah raise ValueError saat input kosong.
-
-    Kode yang menggunakan Application secara normal:
-        if not app.validate_input(...):        # aman di Application
-            messagebox.showwarning(...)
-
-    Kode yang sama akan crash jika 'app' diganti AdminApplication:
-        if not app.validate_input(...):        # ← ValueError! tidak terduga
-            messagebox.showwarning(...)
-
-    Solusi: override harus tetap return bool, jangan raise exception.
-    """
 
     def validate_input(self, val1, val2, val3, val4, val5):
-        # PELANGGARAN LSP: parent tidak raise → subclass raise ValueError
         if val1 == '' or val2 == '' or val3 == '' or val4 == '' or val5 == '':
             raise ValueError(
                 "Admin mode: semua field wajib diisi, tidak boleh kosong!"
             )
         return True
 
-
-# ── Pelanggaran 3: ReportOnlyApp melanggar ISP + LSP ──────────────────────
 class ReportOnlyApp(Application):
-    """
-    PELANGGARAN ISP:
-        ReportOnlyApp hanya butuh show_form() dan generate_report().
-        Tapi karena mewarisi BaseAppManager (fat interface), terpaksa
-        mengimplementasi save_data() dan delete_data() sebagai dummy (pass).
 
-    PELANGGARAN LSP — pola: subclass raise exception yang parent tidak raise.
-        Application.showdetails() tidak pernah raise exception,
-        selalu menampilkan data ke GUI frame dengan sukses.
-        ReportOnlyApp.showdetails() malah raise NotImplementedError.
-        Kode yang memanggil showdetails() akan crash jika objeknya
-        diganti ReportOnlyApp.
-
-    Solusi ISP : setelah Orang 1 pisah interface, ReportOnlyApp
-                 cukup warisi IFormView + IReportable saja.
-    Solusi LSP : showdetails() harus tetap tampilkan GUI (patuhi kontrak).
-                 Buat method baru print_report() untuk fitur console.
-    """
-
-    # PELANGGARAN ISP: dummy method, tidak relevan tapi terpaksa ada
     def save_data(self):
         pass
 
     def delete_data(self):
         pass
 
-    # PELANGGARAN LSP: parent tidak raise → subclass raise NotImplementedError
     def showdetails(self):
         raise NotImplementedError(
             "ReportOnlyApp tidak mendukung tampilan tabel GUI. "
@@ -398,15 +314,9 @@ class ReportOnlyApp(Application):
         )
 
     def generate_report(self):
-        """Satu-satunya method yang benar-benar relevan di kelas ini."""
         print("=== LAPORAN APPOINTMENTS ===")
         for row in self.alldata:
             print(row)
-
-
-# ============================================================
-# Main — identik dengan kode asli, output tidak berubah
-# ============================================================
 
 def menubar():
     main_menu = Menu()
@@ -422,7 +332,7 @@ def menubar():
 
 
 window = Tk()
-b = Application(window)   # tetap Application biasa → output identik dengan asli
+b = Application(window) 
 b.startpage()
 window.config(menu=menubar())
 window.title("Hospital Management")
