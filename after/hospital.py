@@ -10,25 +10,12 @@ ids = []
 number = []
 patients = []
 
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PERBAIKAN 1 — ISP (Orang 1)                                ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  BaseAppManager dipecah menjadi 3 interface kecil:           ║
-# ║    IFormView   → show_form()                                 ║
-# ║    IDataWriter → save_data(), delete_data()                  ║
-# ║    IReportable → generate_report()                           ║
-# ║  Setiap kelas hanya mewarisi interface yang dibutuhkan.      ║
-# ╚══════════════════════════════════════════════════════════════╝
-
 class IFormView:
-    """Interface untuk kelas yang menampilkan form UI."""
     def show_form(self):
         raise NotImplementedError
 
 
 class IDataWriter:
-    """Interface untuk kelas yang menulis/menghapus data."""
     def save_data(self):
         raise NotImplementedError
 
@@ -37,20 +24,9 @@ class IDataWriter:
 
 
 class IReportable:
-    """Interface untuk kelas yang menghasilkan laporan."""
     def generate_report(self):
         raise NotImplementedError
 
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PERBAIKAN 2 — LSP (Orang 2)                                ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  Application.validate_input() → return bool, tidak raise     ║
-# ║  AdminApplication.validate_input() → tetap return bool,      ║
-# ║  tidak lagi raise ValueError. Kontrak parent dipatuhi.       ║
-# ╚══════════════════════════════════════════════════════════════╝
-
-# Application hanya mewarisi IFormView dan IDataWriter (ISP fix)
 class Application(IFormView, IDataWriter):
 
     def __init__(self, window):
@@ -64,20 +40,16 @@ class Application(IFormView, IDataWriter):
         self.updateframe = Frame(self.window)
         self.deleteframe = Frame(self.window)
 
-    # ── IFormView ──
     def show_form(self):
         self.startpage()
 
-    # ── IDataWriter ──
     def save_data(self):
         self.add_appointment()
 
     def delete_data(self):
         self.deletee()
 
-    # ── Kontrak LSP terjaga: hanya return bool, tidak raise ──
     def validate_input(self, val1, val2, val3, val4, val5):
-        """Return True jika valid, False jika ada field kosong. Tidak raise."""
         if val1 == '' or val2 == '' or val3 == '' or val4 == '' or val5 == '':
             return False
         return True
@@ -319,47 +291,16 @@ class Application(IFormView, IDataWriter):
         self.deleteframe.pack()
 
 
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PERBAIKAN 2 — LSP: AdminApplication (Orang 2)              ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  validate_input() kini mematuhi kontrak parent:              ║
-# ║  return bool, tidak raise exception apapun.                  ║
-# ║  AdminApplication sekarang bisa menggantikan Application     ║
-# ║  dengan aman tanpa merusak kode pemanggil.                   ║
-# ╚══════════════════════════════════════════════════════════════╝
-
 class AdminApplication(Application):
-    """Subclass untuk mode admin — dapat menggantikan Application dengan aman."""
 
     def validate_input(self, val1, val2, val3, val4, val5):
-        # LSP terpenuhi: patuhi kontrak parent → return bool, tidak raise
         if val1 == '' or val2 == '' or val3 == '' or val4 == '' or val5 == '':
-            return False   # sama seperti parent, tidak crash
+            return False  
         return True
 
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  PERBAIKAN 3 — ISP + LSP: ReportOnlyApp (Orang 3)          ║
-# ╠══════════════════════════════════════════════════════════════╣
-# ║  ISP: ReportOnlyApp kini hanya mewarisi IFormView dan        ║
-# ║       IReportable. Tidak ada lagi dummy save_data()          ║
-# ║       dan delete_data() yang tidak relevan.                  ║
-# ║                                                              ║
-# ║  LSP: showdetails() kini mematuhi kontrak parent —           ║
-# ║       mendelegasikan ke super(), tidak raise exception.      ║
-# ║       Fitur cetak console dipindah ke print_report()         ║
-# ║       sebagai method baru yang terpisah.                     ║
-# ╚══════════════════════════════════════════════════════════════╝
-
 class ReportOnlyApp(IFormView, IReportable):
-    """
-    Subclass khusus laporan.
-    ISP  : hanya warisi IFormView + IReportable, bukan IDataWriter.
-    LSP  : showdetails() delegasikan ke parent, tidak raise.
-    """
 
     def __init__(self, window):
-        # Butuh inisialisasi manual karena tidak lagi inherit Application penuh
         self.window = window
         self.v = IntVar()
         c.execute("SELECT * FROM appointments")
@@ -370,22 +311,15 @@ class ReportOnlyApp(IFormView, IReportable):
         self.updateframe = Frame(self.window)
         self.deleteframe = Frame(self.window)
 
-    # ── IFormView ──
     def show_form(self):
         self.startpage()
 
-    # ── IReportable ──
     def generate_report(self):
-        """Cetak laporan ke console — method khusus, tidak mengganggu GUI."""
         print("=== LAPORAN APPOINTMENTS ===")
         for row in self.alldata:
             print(row)
 
     def showdetails(self):
-        """
-        LSP terpenuhi: patuhi kontrak Application.showdetails()
-        — tampilkan data ke GUI frame, tidak raise exception.
-        """
         self.main.destroy()
         self.showdetailsframe.destroy()
         self.updateframe.destroy()
@@ -473,15 +407,11 @@ class ReportOnlyApp(IFormView, IReportable):
         self.main.pack()
 
     def updatee(self):
-        pass  # ReportOnlyApp tidak mendukung update
+        pass 
 
     def deletee(self):
-        pass  # ReportOnlyApp tidak mendukung delete
+        pass  
 
-
-# ============================================================
-# Main — output identik dengan kode asli
-# ============================================================
 
 def menubar():
     main_menu = Menu()
@@ -497,7 +427,7 @@ def menubar():
 
 
 window = Tk()
-b = Application(window)   # output identik dengan kode asli
+b = Application(window)   
 b.startpage()
 window.config(menu=menubar())
 window.title("Hospital Management")
